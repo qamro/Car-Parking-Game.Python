@@ -104,6 +104,9 @@ class ParkingGame:
         self._park_threshold: float = 1.5            # Seconds to confirm park
         self._all_spots_parked: bool = False          # Whether all spots are satisfied
 
+        # Track which spots have been parked (for multi-spot levels)
+        self._completed_spots: set[int] = set()      # IDs of spots already parked
+
         # Vehicle switch cooldown
         self._switch_cooldown: float = 0.0
 
@@ -297,6 +300,7 @@ class ParkingGame:
     def _resume_game(self) -> None:
         """Transition from PAUSED → PLAYING."""
         self._menu.hide_pause_menu()
+        self._score_manager.resume_timer()           # Continue countdown from where it was
         self._hud.show()
         self._hud.clear_message()
         self._state = STATE_PLAYING
@@ -359,6 +363,7 @@ class ParkingGame:
         self._park_timer = 0.0
         self._all_spots_parked = False
         self._collision_cooldown = 0.0
+        self._completed_spots = set()                # Clear completed spots for new level
 
     # ------------------------------------------------------------------
     # Per-frame update (called by Ursina every frame)
@@ -465,28 +470,60 @@ class ParkingGame:
             self._vehicle.position = pos
             self._vehicle.current_speed *= 0.5       # Slow on boundary hit
 
-        # ── Parking detection ─────────────────────────────────────────
-        all_parked = True
+        # ── Parking detection (supports multi-spot levels) ────────────
         vehicle_pos = self._vehicle.position
         vehicle_rot = self._vehicle.rotation_y
+        currently_in_spot = False  # Whether the vehicle is in an uncompleted spot
 
         for spot in self._level_manager.active_spots:
+            # Skip spots that have already been completed
+            if spot.spot_id in self._completed_spots:
+                continue
+
             parked = spot.is_vehicle_parked(vehicle_pos, vehicle_rot)
             spot.set_highlight(not parked and self._is_near_spot(vehicle_pos, spot))
-            if not parked:
-                all_parked = False
 
-        if all_parked and abs(self._vehicle.current_speed) < 0.5:
+            if parked:
+                currently_in_spot = True
+
+        # Check if vehicle is stationary in an uncompleted spot
+        if currently_in_spot and abs(self._vehicle.current_speed) < 0.5:
             self._park_timer += dt
-            self._hud.show_message("Hold still...", color.yellow)
+            remaining_spots = len(self._level_manager.active_spots) - len(self._completed_spots)
+            self._hud.show_message(f"Hold still... ({remaining_spots} spot(s) left)", color.yellow)
 
             if self._park_timer >= self._park_threshold:
-                # Successfully parked!
-                self._complete_level()
-                return
+                # Mark the current spot as completed
+                for spot in self._level_manager.active_spots:
+                    if spot.spot_id not in self._completed_spots:
+                        if spot.is_vehicle_parked(vehicle_pos, vehicle_rot):
+                            self._completed_spots.add(spot.spot_id)
+                            # Score this spot's accuracy immediately
+                            accuracy = spot.calculate_accuracy(vehicle_pos, vehicle_rot)
+                            self._score_manager.add_parking_score(accuracy)
+                            spot.set_highlight(False)  # Visual feedback: done
+                            break  # One spot at a time
+
+                self._park_timer = 0.0  # Reset timer for next spot
+
+                # Check if ALL spots are now completed
+                if len(self._completed_spots) >= len(self._level_manager.active_spots):
+                    self._complete_level()
+                    return
+                else:
+                    remaining = len(self._level_manager.active_spots) - len(self._completed_spots)
+                    self._hud.show_message(
+                        f"Spot parked! {remaining} more to go", color.rgb(0, 255, 100)
+                    )
         else:
             self._park_timer = 0.0
-            self._hud.clear_message()
+            if not self._completed_spots:
+                self._hud.clear_message()
+            else:
+                remaining = len(self._level_manager.active_spots) - len(self._completed_spots)
+                self._hud.show_message(
+                    f"{remaining} spot(s) remaining", color.rgb(200, 200, 200)
+                )
 
         # ── Timer check ───────────────────────────────────────────────
         if self._score_manager.is_time_up:
@@ -519,14 +556,7 @@ class ParkingGame:
     # ------------------------------------------------------------------
     def _complete_level(self) -> None:
         """Handle successful parking — show results screen."""
-        # Calculate accuracy for each spot and add to score
-        vehicle_pos = self._vehicle.position
-        vehicle_rot = self._vehicle.rotation_y
-
-        for spot in self._level_manager.active_spots:
-            accuracy = spot.calculate_accuracy(vehicle_pos, vehicle_rot)
-            self._score_manager.add_parking_score(accuracy)
-
+        # Accuracy was already added per-spot during parking detection
         # Finalise score
         results = self._score_manager.finalize_level()
 
@@ -556,6 +586,7 @@ class ParkingGame:
         # Pause / resume toggle
         if key == "escape":
             if self._state == STATE_PLAYING:
+                self._score_manager.pause_timer()    # Freeze countdown while paused
                 self._state = STATE_PAUSED
                 self._hud.hide()
                 self._menu.show_pause_menu()
