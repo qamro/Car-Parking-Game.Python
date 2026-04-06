@@ -92,6 +92,7 @@ class ScoreManager:
         """
         if self._is_timing:
             self._paused_elapsed += _time.time() - self._start_time
+            self._elapsed_time = self._paused_elapsed  # Keep elapsed_time in sync
             self._is_timing = False
 
     def resume_timer(self) -> None:
