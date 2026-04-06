@@ -29,6 +29,7 @@ class ScoreManager:
         self._elapsed_time: float = 0.0            # Seconds elapsed this level
         self._is_timing: bool = False              # Whether the timer is running
         self._level_time_limit: float = 60.0       # Current level's time limit
+        self._paused_elapsed: float = 0.0          # Accumulated time before pause
 
     # ------------------------------------------------------------------
     # Properties (ENCAPSULATION — controlled reads)
@@ -50,9 +51,9 @@ class ScoreManager:
 
     @property
     def elapsed_time(self) -> float:
-        """Return seconds elapsed since the level timer started."""
+        """Return total seconds elapsed (accounts for pauses)."""
         if self._is_timing:
-            return _time.time() - self._start_time
+            return self._paused_elapsed + (_time.time() - self._start_time)
         return self._elapsed_time
 
     @property
@@ -73,14 +74,31 @@ class ScoreManager:
         self._start_time = _time.time()
         self._level_time_limit = time_limit
         self._is_timing = True
+        self._paused_elapsed = 0.0                 # Reset accumulated pause time
         self._level_score = 0.0
         self._collision_count = 0
 
     def stop_timer(self) -> None:
         """Stop the level timer and record elapsed time."""
         if self._is_timing:
-            self._elapsed_time = _time.time() - self._start_time
+            self._elapsed_time = self._paused_elapsed + (_time.time() - self._start_time)
             self._is_timing = False
+
+    def pause_timer(self) -> None:
+        """Pause the timer — accumulates elapsed time so far and stops the clock.
+
+        Called when the game enters the PAUSED state so the countdown does not
+        continue while the pause menu is open.
+        """
+        if self._is_timing:
+            self._paused_elapsed += _time.time() - self._start_time
+            self._is_timing = False
+
+    def resume_timer(self) -> None:
+        """Resume the timer after a pause — resets the start time to now."""
+        if not self._is_timing:
+            self._start_time = _time.time()        # Restart the clock from now
+            self._is_timing = True
 
     # ------------------------------------------------------------------
     # Scoring
@@ -155,6 +173,7 @@ class ScoreManager:
         self._level_score = 0.0
         self._collision_count = 0
         self._elapsed_time = 0.0
+        self._paused_elapsed = 0.0
         self._is_timing = False
 
     def reset_all(self) -> None:
