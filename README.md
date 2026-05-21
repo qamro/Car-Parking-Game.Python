@@ -31,7 +31,7 @@ pip install ursina
 ## Running
 
 ```bash
-python main.py
+python car_parking.py
 ```
 
 ## Controls
