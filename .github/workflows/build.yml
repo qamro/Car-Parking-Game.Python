@@ -1,0 +1,57 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install -r requirements.txt
+
+      - name: Build with PyInstaller (Linux/Mac)
+        if: runner.os != 'Windows'
+        run: pyinstaller --onefile --windowed car_parking.py
+
+      - name: Build with PyInstaller (Windows)
+        if: runner.os == 'Windows'
+        run: pyinstaller --onefile --windowed car_parking.py
+
+      - name: Zip the binary (Linux)
+        if: runner.os == 'Linux'
+        run: zip -j car_parking_linux.zip dist/car_parking
+
+      - name: Zip the binary (Mac)
+        if: runner.os == 'macOS'
+        run: zip -j car_parking_mac.zip dist/car_parking
+
+      - name: Zip the binary (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path dist/car_parking.exe -DestinationPath car_parking_windows.zip
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            car_parking_linux.zip
+            car_parking_mac.zip
+            car_parking_windows.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
