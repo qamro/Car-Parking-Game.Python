@@ -26,12 +26,7 @@ jobs:
           pip install pyinstaller
           pip install -r requirements.txt
 
-      - name: Build with PyInstaller (Linux/Mac)
-        if: runner.os != 'Windows'
-        run: pyinstaller --onefile --windowed car_parking.py
-
-      - name: Build with PyInstaller (Windows)
-        if: runner.os == 'Windows'
+      - name: Build with PyInstaller
         run: pyinstaller --onefile --windowed car_parking.py
 
       - name: Zip the binary (Linux)
