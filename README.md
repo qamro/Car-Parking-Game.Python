@@ -31,6 +31,7 @@ pip install ursina
 ## Running
 
 ```bash
+source venv/bin/activate
 python3 car_parking.py
 ```
 
