@@ -25,6 +25,8 @@ A complete 3D car parking game built in Python using the **Ursina Engine** (buil
 ## Installation
 
 ```bash
+python3 -m venv venv
+source venv/bin/activate
 pip install ursina
 ```
 
