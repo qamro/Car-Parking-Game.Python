@@ -2,6 +2,12 @@
 
 A complete 3D car parking game built in Python using the **Ursina Engine** (built on Panda3D). Features full OOP design with detailed comments explaining every principle.
 
+## 📸 Demo Screenshots
+
+
+<img width="1919" height="1040" alt="Parking Game" src="https://github.com/user-attachments/assets/0c75a735-1f7f-40e8-b051-899393bd4421" />
+
+
 ## Features
 
 - **Third-person 3D camera** with smooth chase behaviour
